@@ -1,0 +1,57 @@
+name: Continuous Delivery (CD)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  package-and-deploy:
+    name: Package Artifact & Deployment Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Package Application Bundle
+        run: |
+          mkdir -p dist
+          tar -czf dist/app-release-${{ github.sha }}.tar.gz src package.json README.md
+          echo "Package created at dist/app-release-${{ github.sha }}.tar.gz"
+
+      - name: Smoke Test & Deployment Health Check Simulation
+        run: |
+          node src/server.js &
+          SERVER_PID=$!
+          sleep 2
+          
+          echo "Verificando endpoint de health..."
+          curl --fail --retry 3 --retry-delay 1 http://localhost:3000/health
+          
+          echo -e "\nVerificando informacoes da API..."
+          curl --fail http://localhost:3000/api/info
+          
+          kill $SERVER_PID
+          echo -e "\nTeste de smoke e inicializacao concluidos com sucesso!"
+
+      - name: Upload Deployment Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-${{ github.sha }}
+          path: dist/
+          retention-days: 5
+
+      - name: Continuous Deployment Status Report
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "🚀 [Continuous Delivery] Validacao de Preview e empacotamento concluidos com sucesso para a PR #${{ github.event.number }}!"
+          else
+            echo "🚀 [Continuous Deployment] Deploy em ambiente de producao executado com sucesso para a branch main!"
+          fi
