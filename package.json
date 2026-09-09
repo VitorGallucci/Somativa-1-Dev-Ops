@@ -1,0 +1,17 @@
+{
+  "name": "somativa-1-devops",
+  "version": "1.0.0",
+  "description": "API REST simples e servico de calculos para a disciplina de DevOps",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "devops",
+    "ci-cd",
+    "tests"
+  ],
+  "author": "Vitor Gallucci",
+  "license": "ISC"
+}
