@@ -1,23 +1,22 @@
-# DevOps: Calculadora API & Pipeline de CI/CD Completo
+# DevOps: Calculadora API, CI/CD Pipeline & Docker Container
 
 [![Continuous Integration (CI)](https://github.com/VitorGallucci/Somativa-1-Dev-Ops/actions/workflows/ci.yml/badge.svg)](https://github.com/VitorGallucci/Somativa-1-Dev-Ops/actions/workflows/ci.yml)
 [![Continuous Delivery (CD)](https://github.com/VitorGallucci/Somativa-1-Dev-Ops/actions/workflows/cd.yml/badge.svg)](https://github.com/VitorGallucci/Somativa-1-Dev-Ops/actions/workflows/cd.yml)
 
 Projeto prático desenvolvido para a disciplina de **DevOps**.
 
-Este repositório implementa um fluxo completo de **Integração Contínua (CI)** e **Entrega/Deploy Contínuo (CD)** utilizando **GitHub Actions**, com suíte de testes automatizados, verificação de qualidade de código, empacotamento de artefatos e testes de fumaça (smoke testing).
+Este repositório implementa um fluxo completo de **Integração Contínua (CI)**, **Entrega/Deploy Contínuo (CD)** via **GitHub Actions** e **Dockerização** da aplicação para execução isolada e portável em containers.
 
 ---
 
 ## 🚀 Tecnologias Utilizadas
 
 - **Runtime:** [Node.js](https://nodejs.org/) (v20+ e v22+)
+- **Containerização:** [Docker](https://www.docker.com/) (imagem base `node:22-alpine`)
 - **Protocolo:** HTTP / REST
-- **Test Runner & Assertions:** `node:test` e `node:assert/strict` (nativos do Node.js, sem dependências externas)
+- **Test Runner & Assertions:** `node:test` e `node:assert/strict` (nativos do Node.js)
 - **CI/CD:** GitHub Actions
 - **Controle de Versão:** Git & GitHub
-
-> **Nota de Arquitetura DevOps:** O projeto foi arquitetado utilizando os módulos nativos do Node.js para garantir execução de testes em milissegundos e pipeline de CI/CD sem gargalos ou riscos de quebra de pacotes externos.
 
 ---
 
@@ -26,7 +25,7 @@ Este repositório implementa um fluxo completo de **Integração Contínua (CI)*
 ```text
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml            # Pipeline de Integracao Continua (CI)
+│       ├── ci.yml            # Pipeline de Integracao Continua (CI e Docker build test)
 │       └── cd.yml            # Pipeline de Entrega/Deploy Continuo (CD)
 ├── src/
 │   ├── app.js                # Roteamento e manipulador de requisicoes HTTP
@@ -35,93 +34,86 @@ Este repositório implementa um fluxo completo de **Integração Contínua (CI)*
 ├── test/
 │   ├── api.test.js           # Testes de integracao das rotas HTTP
 │   └── calculator.test.js    # Testes unitarios do modulo de calculos
+├── .dockerignore             # Arquivos excluidos do contexto do Docker
 ├── .gitignore                # Arquivos e pastas ignorados pelo Git
+├── Dockerfile                # Definicao da imagem Docker do projeto
 ├── package.json              # Configuracoes, scripts e metadados
 └── README.md                 # Documentacao completa da aplicacao
 ```
 
 ---
 
+## 🐳 Execução via Docker (Container)
+
+A aplicação foi completamente dockerizada com foco em segurança (usuário não-root `node`), leveza (`node:22-alpine`) e resiliência (`HEALTHCHECK` embutido).
+
+### 1. Construir a Imagem Docker
+```bash
+docker build -t somativa-devops-api:latest .
+```
+
+### 2. Iniciar o Container
+```bash
+docker run -d --name calculadora-app -p 3000:3000 somativa-devops-api:latest
+```
+
+### 3. Verificar o Status do Container
+```bash
+docker ps
+```
+Você verá o container `calculadora-app` listado com status `Up` e a porta `0.0.0.0:3000->3000/tcp` mapeada.
+
+### 4. Testar a Aplicação no Container
+- **Healthcheck:**
+  ```bash
+  curl http://localhost:3000/health
+  ```
+- **Realizar um Cálculo:**
+  ```bash
+  curl -X POST http://localhost:3000/api/calculate \
+    -H "Content-Type: application/json" \
+    -d '{"operation":"multiply","a":7,"b":8}'
+  ```
+
+### 5. Parar o Container
+```bash
+docker stop calculadora-app && docker rm calculadora-app
+```
+
+---
+
 ## 🔄 Fluxo de CI/CD (GitHub Actions)
 
-O pipeline foi estruturado em dois workflows independentes e complementares:
+O pipeline conta com dois workflows integrados:
 
 ### 1. Continuous Integration (CI) - `.github/workflows/ci.yml`
-- **Gatilhos:** Disparado a cada `push` na branch `main` e em todas as `pull_request` direcionadas à `main`.
-- **Estratégia de Matriz:** Executa em múltiplas versões do Node.js (`20.x` e `22.x`) sobre `ubuntu-latest`.
-- **Etapas:**
-  1. Checkout do código-fonte (`actions/checkout@v4`).
-  2. Configuração do ambiente Node.js (`actions/setup-node@v4`).
-  3. Verificação de sintaxe e qualidade (`npm run lint`).
-  4. Execução da suíte completa de testes automatizados (`npm test`).
+- **Gatilhos:** Disparado em `push` na branch `main` e em `pull_request` direcionadas à `main`.
+- **Jobs:**
+  1. `build-and-test`: Executa em matriz com Node.js `20.x` e `22.x`, validando lint (`npm run lint`) e suíte de testes (`npm test`).
+  2. `docker-build-test`: Valida o build do `Dockerfile` através do `docker/build-push-action`, garantindo que nenhuma quebra de containerização passe despercebida.
 
 ### 2. Continuous Delivery / Deployment (CD) - `.github/workflows/cd.yml`
 - **Gatilhos:** Disparado em `push` na branch `main` e em `pull_request` direcionadas à `main`.
-- **Etapas:**
-  1. Checkout do repositório.
-  2. Empacotamento do pacote de release da aplicação (`dist/app-release-<sha>.tar.gz`).
-  3. **Smoke Test & Validação de Deploy:** Inicializa o servidor em background e realiza testes de saúde nos endpoints `/health` e `/api/info`.
-  4. **Upload do Artefato:** Armazena o pacote de release gerado como artefato da build via `actions/upload-artifact@v4`.
-  5. **Status de Rollout:** Emite relatório de preview (em PRs) ou deploy de produção (na branch `main`).
+- **Jobs:**
+  1. Empacotamento do pacote de release (`dist/app-release-<sha>.tar.gz`).
+  2. **Smoke Test & Validação de Deploy:** Sobe a aplicação e testa endpoints de saúde.
+  3. **Upload do Artefato:** Armazena o artefato gerado via `actions/upload-artifact@v4`.
+  4. **Relatório de Rollout:** Emite log de validação para preview em PR ou deploy em produção.
 
 ---
 
-## 🛠️ Como Executar o Projeto Localmente
+## 🛠️ Como Executar Localmente (Sem Docker)
 
-### Pré-requisitos
-- Node.js instalado (v18+)
-
-### Iniciar o Servidor
 ```bash
 npm start
 ```
-O servidor será iniciado na porta padrão `3000` (ou na porta definida pela variável `PORT`).
+O servidor estará acessível em `http://localhost:3000`.
 
 ---
 
-## 🧪 Como Executar os Testes Automatizados
+## 🧪 Testes Automatizados
 
-### Verificação de Sintaxe
 ```bash
-npm run lint
+npm run lint  # Verificacao estatica de sintaxe
+npm test      # 18 testes unitarios e de integracao
 ```
-
-### Executar Testes Unitários e de Integração
-```bash
-npm test
-```
-
-A suíte executará:
-- **18 testes** cobrindo operações matemáticas, casos de exceção (divisão por zero, tipos inválidos) e rotas HTTP da API (`/health`, `/api/info`, `/api/calculate`, 404).
-
----
-
-## 📡 Endpoints da API
-
-### 1. Healthcheck
-- **Rota:** `GET /health`
-- **Descrição:** Verifica se a aplicação está online e funcional.
-- **Resposta:**
-  ```json
-  {
-    "status": "UP",
-    "uptime": 12.34,
-    "timestamp": "2026-09-08T21:12:00.000Z"
-  }
-  ```
-
-### 2. Informações da API
-- **Rota:** `GET /api/info`
-- **Descrição:** Retorna metadados da aplicação.
-
-### 3. Execução de Cálculos
-- **Rota:** `POST /api/calculate`
-- **Exemplo de Body (JSON):**
-  ```json
-  {
-    "operation": "add",
-    "a": 10,
-    "b": 20
-  }
-  ```
-- **Operações suportadas:** `add`, `subtract`, `multiply`, `divide`, `power`, `factorial`.

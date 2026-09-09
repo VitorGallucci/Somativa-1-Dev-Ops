@@ -29,3 +29,21 @@ jobs:
 
       - name: Run Automated Test Suite
         run: npm test
+
+  docker-build-test:
+    name: Docker Container Build Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: somativa-devops-api:test
