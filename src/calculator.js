@@ -52,11 +52,39 @@ function factorial(n) {
   return result;
 }
 
+function percentage(part, total) {
+  validateNumbers(part, total);
+  if (total === 0) {
+    throw new Error('Total nao pode ser zero para calculo de porcentagem');
+  }
+  return (part / total) * 100;
+}
+
+function squareRoot(n) {
+  validateNumbers(n);
+  if (n < 0) {
+    throw new Error('Nao e possivel calcular raiz quadrada de numero negativo');
+  }
+  return Math.sqrt(n);
+}
+
+function average(numbers) {
+  if (!Array.isArray(numbers) || numbers.length === 0) {
+    throw new Error('E necessario fornecer um array com pelo menos um numero');
+  }
+  validateNumbers(...numbers);
+  const sum = numbers.reduce((acc, curr) => acc + curr, 0);
+  return sum / numbers.length;
+}
+
 module.exports = {
   add,
   subtract,
   multiply,
   divide,
   power,
-  factorial
+  factorial,
+  percentage,
+  squareRoot,
+  average
 };
