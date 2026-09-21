@@ -1,11 +1,11 @@
-# DevOps: Calculadora API, CI/CD Pipeline & Docker Container
+# DevOps: Calculadora API, CI/CD Pipeline, Docker & Alertas
 
 [![Continuous Integration (CI)](https://github.com/VitorGallucci/Somativa-1-Dev-Ops/actions/workflows/ci.yml/badge.svg)](https://github.com/VitorGallucci/Somativa-1-Dev-Ops/actions/workflows/ci.yml)
 [![Continuous Delivery (CD)](https://github.com/VitorGallucci/Somativa-1-Dev-Ops/actions/workflows/cd.yml/badge.svg)](https://github.com/VitorGallucci/Somativa-1-Dev-Ops/actions/workflows/cd.yml)
 
 Projeto prático desenvolvido para a disciplina de **DevOps**.
 
-Este repositório implementa um fluxo completo de **Integração Contínua (CI)**, **Entrega/Deploy Contínuo (CD)** via **GitHub Actions** e **Dockerização** da aplicação para execução isolada e portável em containers.
+Este repositório implementa um fluxo completo de **Integração Contínua (CI)**, **Entrega/Deploy Contínuo (CD)**, **Dockerização** da aplicação e **Notificações automáticas de alertas** no **Microsoft Teams** (com suporte a Discord).
 
 ---
 
@@ -15,7 +15,8 @@ Este repositório implementa um fluxo completo de **Integração Contínua (CI)*
 - **Containerização:** [Docker](https://www.docker.com/) (imagem base `node:22-alpine`)
 - **Protocolo:** HTTP / REST
 - **Test Runner & Assertions:** `node:test` e `node:assert/strict` (nativos do Node.js)
-- **CI/CD:** GitHub Actions
+- **CI/CD & Automação:** GitHub Actions
+- **Alertas & Notificações:** Microsoft Teams (Adaptive Card / MessageCard) e Discord (Webhooks)
 - **Controle de Versão:** Git & GitHub
 
 ---
@@ -26,7 +27,10 @@ Este repositório implementa um fluxo completo de **Integração Contínua (CI)*
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml            # Pipeline de Integracao Continua (CI e Docker build test)
-│       └── cd.yml            # Pipeline de Entrega/Deploy Continuo (CD)
+│       ├── cd.yml            # Pipeline de Entrega/Deploy Continuo (CD)
+│       └── alertas-teams.yml # Workflow de disparo de alertas para Microsoft Teams
+├── scripts/
+│   └── send-alert.js         # Script de formatacao e envio do webhook de alertas
 ├── src/
 │   ├── app.js                # Roteamento e manipulador de requisicoes HTTP
 │   ├── calculator.js         # Regras de negocio e funcoes aritmeticas
@@ -40,6 +44,28 @@ Este repositório implementa um fluxo completo de **Integração Contínua (CI)*
 ├── package.json              # Configuracoes, scripts e metadados
 └── README.md                 # Documentacao completa da aplicacao
 ```
+
+---
+
+## 🔔 Alertas e Notificações (Microsoft Teams)
+
+O projeto possui integração com o **Microsoft Teams** (e **Discord**) via GitHub Actions para notificar commits e merges na branch `main`.
+
+### Workflow: `.github/workflows/alertas-teams.yml`
+- **Gatilhos:** Executado automaticamente a cada `push` ou `merge` na branch `main` e manualmente via `workflow_dispatch`.
+- **Payload:** Envia um cartão interativo contendo autor, repositório, branch, hash do commit, mensagem e link direto para visualização no GitHub.
+
+### Como Configurar o Webhook no Microsoft Teams:
+1. No Microsoft Teams, abra ou crie um canal (ex: `DevOps-Alertas`).
+2. Clique nas reticências (`...`) ao lado do nome do canal e selecione **Workflows** (ou **Conectores** se no Teams clássico).
+3. Pesquise por **"Post to a channel when a webhook request is received"** (ou "Webhook de Entrada / Incoming Webhook").
+4. Avance e copie o link do Webhook gerado.
+5. No GitHub, acesse seu repositório:
+   - **Settings** > **Secrets and variables** > **Actions** > **New repository secret**.
+   - Nome: `TEAMS_WEBHOOK_URL`
+   - Valor: cole a URL copiada do Microsoft Teams.
+
+*(Alternativamente, se desejar testar no Discord, basta criar a secret `DISCORD_WEBHOOK_URL`).*
 
 ---
 
@@ -61,44 +87,20 @@ docker run -d --name calculadora-app -p 3000:3000 somativa-devops-api:latest
 ```bash
 docker ps
 ```
-Você verá o container `calculadora-app` listado com status `Up` e a porta `0.0.0.0:3000->3000/tcp` mapeada.
-
-### 4. Testar a Aplicação no Container
-- **Healthcheck:**
-  ```bash
-  curl http://localhost:3000/health
-  ```
-- **Realizar um Cálculo:**
-  ```bash
-  curl -X POST http://localhost:3000/api/calculate \
-    -H "Content-Type: application/json" \
-    -d '{"operation":"multiply","a":7,"b":8}'
-  ```
-
-### 5. Parar o Container
-```bash
-docker stop calculadora-app && docker rm calculadora-app
-```
 
 ---
 
 ## 🔄 Fluxo de CI/CD (GitHub Actions)
 
-O pipeline conta com dois workflows integrados:
-
 ### 1. Continuous Integration (CI) - `.github/workflows/ci.yml`
-- **Gatilhos:** Disparado em `push` na branch `main` e em `pull_request` direcionadas à `main`.
-- **Jobs:**
-  1. `build-and-test`: Executa em matriz com Node.js `20.x` e `22.x`, validando lint (`npm run lint`) e suíte de testes (`npm test`).
-  2. `docker-build-test`: Valida o build do `Dockerfile` através do `docker/build-push-action`, garantindo que nenhuma quebra de containerização passe despercebida.
+- Validação estática de sintaxe e estilo (`npm run lint`).
+- Matriz de testes automatizados com Node.js 20.x e 22.x (`npm test`).
+- Teste de build da imagem Docker (`docker/build-push-action`).
 
 ### 2. Continuous Delivery / Deployment (CD) - `.github/workflows/cd.yml`
-- **Gatilhos:** Disparado em `push` na branch `main` e em `pull_request` direcionadas à `main`.
-- **Jobs:**
-  1. Empacotamento do pacote de release (`dist/app-release-<sha>.tar.gz`).
-  2. **Smoke Test & Validação de Deploy:** Sobe a aplicação e testa endpoints de saúde.
-  3. **Upload do Artefato:** Armazena o artefato gerado via `actions/upload-artifact@v4`.
-  4. **Relatório de Rollout:** Emite log de validação para preview em PR ou deploy em produção.
+- Empacotamento do pacote de release (`dist/app-release-<sha>.tar.gz`).
+- Smoke Test & Validação de Deploy com inicialização do servidor e checagem de rotas de saúde.
+- Upload do artefato para download via `actions/upload-artifact@v4`.
 
 ---
 
@@ -107,7 +109,6 @@ O pipeline conta com dois workflows integrados:
 ```bash
 npm start
 ```
-O servidor estará acessível em `http://localhost:3000`.
 
 ---
 

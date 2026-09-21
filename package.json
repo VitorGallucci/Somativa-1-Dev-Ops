@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "test": "node --test test/*.test.js",
-    "lint": "node --check src/app.js src/calculator.js src/server.js test/api.test.js test/calculator.test.js"
+    "lint": "node --check src/app.js src/calculator.js src/server.js test/api.test.js test/calculator.test.js scripts/send-alert.js"
   },
   "keywords": [
     "devops",
